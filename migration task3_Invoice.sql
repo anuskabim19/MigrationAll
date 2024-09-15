@@ -1,0 +1,5 @@
+--Invoice
+--1.	Invoices Missing Organization Address.
+--2.	Invoices has Invoice Date Greater Than Due Date.
+--3.	Invoice Equation.
+--4.	Payment In Invoice Payment is not equal to the sum of payment in Organization Payment

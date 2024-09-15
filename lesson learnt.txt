@@ -1,0 +1,13 @@
+
+Working at RidhiSoft Technologies has been a valuable experience in .NET development. I gained essential skills and insights that will benefit my future endeavors. During my time at RidhiSoft, I learned about the software development life cycle and how the company effectively manages the process to deliver quality software on time.
+
+Key lessons from my internship include:
+
+- Understanding of .NET Framework: I deepened my understanding of the .NET framework, learning to use its libraries and tools to create robust software solutions.
+- Agile Development Methodologies: I learned the value of agile practices like Scrum and Kanban in fostering collaboration, iterative development, and frequent feedback.
+- Object-Oriented Programming (OOP) Principles: I gained experience in designing scalable and maintainable code using OOP concepts such as encapsulation, inheritance, and polymorphism.
+- Database Integration with .NET.
+-Web Development with ASP.NET.
+-Debugging and Troubleshooting: Throughout my internship
+
+This experience has broadened my understanding of the organization and highlighted the importance of a skilled, creative, and innovative workforce in driving success.

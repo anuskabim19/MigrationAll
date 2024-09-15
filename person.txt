@@ -1,0 +1,470 @@
+CREATE OR ALTER PROCEDURE [dbo].[SpAnuska_2024_newToZenopleMigrationTsk]
+AS
+    BEGIN
+
+        SET NOCOUNT ON;
+        SET XACT_ABORT ON;
+        EXEC dbo.EncryptionKeyOpen;
+        DECLARE @OldCount INT ,
+                @NewCOunt INT ,
+                @defaultotplanid INT ,
+                @MappingType VARCHAR (50) ,
+                @TableName VARCHAR (50) ,
+                @UnmappedResourceId INT;
+
+        DECLARE @defaultofficeid INT = ( SELECT o.OfficeId
+                                         -- select *
+                                         FROM   dbo.Office AS o
+                                         WHERE  o.Office = 'Currie' );
+
+        DECLARE @ReferenceNote VARCHAR (50) = N'TestMigration_Anuska';
+
+        SELECT @MappingType = ( SELECT mt.MappingType
+                                FROM   dbo.MappingType AS mt
+                                WHERE  mt.MappingType = 'TestMigration_Anuska' );
+
+        DECLARE @MappingTypeId INT = ( SELECT mt.MappingTypeId
+                                       FROM   dbo.MappingType AS mt
+                                       WHERE  mt.MappingType = 'TestMigration_Anuska' );
+
+
+        DECLARE @DefautAffiliateId INT ,
+                @DefaultBAnkAccountId INT;
+
+        SET @DefaultBAnkAccountId = (SELECT MIN(ba.BankAccountId)
+		--SELECT r.report,dbo.SfListItemGet(ba.AccountTypeListItemId),dbo.SfListItemGet(ba.BankTypeListItemId),* 
+		FROM bankaccount AS ba 
+		inner JOIN dbo.Report AS R ON R.ReportId = ba.ReportId
+		WHERE dbo.SfListItemGet(ba.BankTypeListItemId) LIKE '%Expense%' AND dbo.SfListItemGet(ba.BankTypeListItemId)<>'AccountPayableExpense'); -- SELECT * FROM dbo.BankAccount a INNER JOIN dbo.Tenant t ON t.OrganizationId = a.OrganizationId
+
+        DECLARE @ARDefaultBAnkAccountId INT = (SELECT MIN(ba.BankAccountId)
+		--SELECT r.report,dbo.SfListItemGet(ba.AccountTypeListItemId),dbo.SfListItemGet(ba.BankTypeListItemId),* 
+		FROM bankaccount AS ba 
+		inner JOIN dbo.Report AS R ON R.ReportId = ba.ReportId
+		WHERE dbo.SfListItemGet(ba.BankTypeListItemId) LIKE '%Income%'); -- 
+		
+		 DECLARE @AgencyDefaultBAnkAccountId INT =(SELECT MIN(ba.BankAccountId)
+		--SELECT r.report,dbo.SfListItemGet(ba.AccountTypeListItemId),dbo.SfListItemGet(ba.BankTypeListItemId),* 
+		FROM bankaccount AS ba 
+		inner JOIN dbo.Report AS R ON R.ReportId = ba.ReportId
+		WHERE dbo.SfListItemGet(ba.BankTypeListItemId)='AccountPayableExpense')
+
+        DECLARE @ConvertedUserId INT;
+        SELECT @ConvertedUserId = ( SELECT p.PersonId
+                                    FROM   dbo.Person p
+                                           INNER JOIN dbo.OfficeStaff o ON o.PersonId = p.PersonId
+                                    WHERE  p.Name = 'CONVERTED USER' );
+
+        DECLARE @UserPersonId INT;
+        SELECT @UserPersonId = ( SELECT p.PersonId
+                                 FROM   dbo.Person p
+                                        INNER JOIN dbo.OfficeStaff o ON o.PersonId = p.PersonId
+                                 WHERE  p.Name = 'CONVERTED USER' );
+
+        DECLARE @ZenopleJobPortalId INT = ( SELECT jp.JobPortalId
+                                            FROM   dbo.JobPortal AS jp
+                                            WHERE  jp.JobPortal = 'ZenopleJobPortal' );
+        DECLARE @DataSource INT;
+        SELECT @DataSource = dbo.SfListItemIdGet ('DataSource', 'Migration');
+
+        DECLARE @CustomerWorkflowId INT;
+        SELECT @CustomerWorkflowId = dbo.SfWorkflowIdGet ('Customer');
+
+        DECLARE @TargetWorkflowId INT;
+        SELECT @TargetWorkflowId = dbo.SfWorkflowIdGet ('Target');
+
+        DECLARE @LeadWorkflowId INT;
+        SELECT @LeadWorkflowId = dbo.SfWorkflowIdGet ('Lead');
+
+        DECLARE @NewCustomerWorkflowId INT;
+        SELECT @NewCustomerWorkflowId = dbo.SfWorkflowIdGet ('NewCustomer');
+
+
+        DECLARE @AuthorizedEVerifyStatusListItemId INT = dbo.SfListItemIdGet ('EVerifyStatus', 'Authorized');
+        DECLARE @UnAuthorizedEVerifyStatusListItemId INT = dbo.SfListItemIdGet ('EVerifyStatus', 'Unauthorized');
+
+        DECLARE @AdvanceAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'Advance');
+        DECLARE @AmountAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'Amount');
+        DECLARE @HourlyAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'Hourly');
+        DECLARE @LevyAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'Levy');
+        DECLARE @PercentGrossAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'PercentGross');
+        DECLARE @PercentNetAdjustmentTypeListItemId INT = dbo.SfListItemIdGet ('AdjustmentType', 'PercentNet');
+
+        DECLARE @AmountBenefitTypeListItemId INT = dbo.SfListItemIdGet ('BenefitType', 'Amount');
+        DECLARE @PercentGrossBenefitTypeListItemId INT = dbo.SfListItemIdGet ('BenefitType', 'PercentGross');
+        DECLARE @PercentNetBenefitTypeListItemId INT = dbo.SfListItemIdGet ('BenefitType', 'PercentNet');
+
+        DECLARE @EnteredDateListItemId INT = dbo.SfListItemIdGet ('DateType', 'EnteredDate');
+        DECLARE @InterviewedDateListItemId INT = dbo.SfListItemIdGet ('DateType', 'InterviewedDate');
+        DECLARE @LastPasswordChangeDateListItemId INT = dbo.SfListItemIdGet ('DateType', 'LastPasswordChangeDate');
+        DECLARE @I9DateListItemId INT = dbo.SfListItemIdGet ('DateType', 'I9');
+
+        DECLARE @LeadWorkflowStageId INT;
+        SELECT @LeadWorkflowStageId = dbo.SfWorkflowStageIdGet ('Lead', 'Discovery');
+
+        DECLARE @TargetWorkflowStageId INT;
+        SELECT @TargetWorkflowStageId = dbo.SfWorkflowStageIdGet ('Target', 'Discovery');
+
+        DECLARE @CustomerWorkflowStageId INT;
+        SELECT @CustomerWorkflowStageId = dbo.SfWorkflowStageIdGet ('Customer', 'Customer');
+
+        DECLARE @NewCustomerWorkflowStageId INT;
+        SELECT @NewCustomerWorkflowStageId = dbo.SfWorkflowStageIdGet ('NewCustomer', 'Paperwork');
+
+        DECLARE @InterviewedById INT;
+        SELECT @InterviewedById = dbo.SfListItemIdGet ('UserType', 'InterviewedBy');
+        DECLARE @WOTCStatusListItemId INT = dbo.SfListItemIdGet ('WOTCStatus', 'NotScreened');
+
+        DECLARE @migratedPerformacnelistotemID INT;
+        SELECT @migratedPerformacnelistotemID = dbo.SfListItemIdGet ('performance', 'N/A');
+
+        DECLARE @OTMarkUpListItemId INT = dbo.SfListItemIdGet ('OTBillMarkup', 'OTPayRate');
+        DECLARE @DTMarkUpListItemId INT = dbo.SfListItemIdGet ('DTBillMarkup', 'DTPayRate');
+
+
+        DECLARE @SalesTeamId INT;
+        SELECT @SalesTeamId = dbo.SfListItemIdGet ('UserType', 'SalesRep');
+
+        DECLARE @AccountManagerId INT;
+        SELECT @AccountManagerId = dbo.SfListItemIdGet ('UserType', 'AccountManager');
+
+        DECLARE @HoldAtEmployeeOfficeCheckDeliveryListItemId INT = dbo.SfListItemIdGet (
+                                                                       'CheckDelivery' , 'HoldAtEmployeeOffice');
+
+
+        DECLARE @ConvertedSkillID INT = ( SELECT s.SkillId
+                                          -- select *
+                                          FROM   dbo.Skill AS s
+                                          WHERE  s.Skill = 'Converted' );
+
+        DECLARE @ConvertedDeductionCodeId INT = ( SELECT tc.TransactionCodeId
+                                                  FROM   dbo.TransactionCode AS tc
+                                                         INNER JOIN dbo.Deduction AS d ON d.TransactionCodeId = tc.TransactionCodeId
+                                                  WHERE  tc.TransactionCode = 'Converted' );
+        DECLARE @ConvertedPayCodeId INT = ( SELECT tc.TransactionCodeId
+                                            FROM   dbo.TransactionCode AS tc
+                                                   INNER JOIN dbo.PayCode AS pc ON  pc.TransactionCodeId = tc.TransactionCodeId
+                                                                                AND tc.TransactionCode = 'Converted' );
+        DECLARE @RTPayCodeId INT = ( SELECT tc.TransactionCodeId
+                                     FROM   dbo.TransactionCode AS tc
+                                            INNER JOIN dbo.PayCode AS pc ON  pc.TransactionCodeId = tc.TransactionCodeId
+                                                                         AND tc.TransactionCode = 'RT' );
+        DECLARE @OTPayCodeId INT = ( SELECT tc.TransactionCodeId
+                                     FROM   dbo.TransactionCode AS tc
+                                            INNER JOIN dbo.PayCode AS pc ON  pc.TransactionCodeId = tc.TransactionCodeId
+                                                                         AND tc.TransactionCode = 'OT' );
+        DECLARE @DTPayCodeId INT = ( SELECT tc.TransactionCodeId
+                                     FROM   dbo.TransactionCode AS tc
+                                            INNER JOIN dbo.PayCode AS pc ON  pc.TransactionCodeId = tc.TransactionCodeId
+                                                                         AND tc.TransactionCode = 'DT' );
+
+        DECLARE @SalaryPayCodeId INT = ( SELECT tc.TransactionCodeId
+                                         FROM   dbo.TransactionCode AS tc
+                                                INNER JOIN dbo.PayCode AS pc ON  pc.TransactionCodeId = tc.TransactionCodeId
+                                                                             AND tc.TransactionCode = 'Salary' );
+
+        DECLARE @MessageCommentTypeListItemId INT = dbo.SfListItemIdGet ('CommentType', 'Message');
+
+        DECLARE @EmployeeTitle VARCHAR (50) = N'Employee';
+        DECLARE @NewhireTitle VARCHAR (50) = N'NewHire';
+        DECLARE @MainContactInformationTypeListItemId INT = dbo.SfListItemIdGet ('ContactInformationType', 'Main');
+        DECLARE @EmailContactInformationTypeListItemId INT = dbo.SfListItemIdGet ('ContactInformationType', 'Email');
+        DECLARE @BillingAddressTypeListItemId INT = dbo.SfListItemIdGet ('AddressType', 'Billing');
+        DECLARE @LastPasswordChangeDate INT = dbo.SfListItemIdGet ('DateType', 'LastPasswordChangeDate');
+        DECLARE @LeftNavigationStyleListIitemID INT = dbo.SfListItemIdGet ('NavigationStyle', 'Left');
+        DECLARE @LightThemeListitemId INT = dbo.SfListItemIdGet ('Theme', 'Light');
+        DECLARE @EmployeePortalApplicationId INT = dbo.SfApplicationIdGet ('EmployeePortal');
+        DECLARE @ApplicantPortalApplicationId INT = dbo.SfApplicationIdGet ('ApplicantPortal');
+
+        DECLARE @NewHirePortalApplicationId INT = dbo.SfApplicationIdGet ('NewHirePortal');
+        DECLARE @ContactPortalApplicationId INT = dbo.SfApplicationIdGet ('CustomerPortal');
+        DECLARE @ZenopleJobPortal INT = ( SELECT jp.JobPortalId
+                                          FROM   dbo.JobPortal AS jp
+                                          WHERE  jp.JobPortal = 'ZenopleJobPortal' );
+
+        DECLARE @ResidentAddressTypeListItemId INT = dbo.SfListItemIdGet ('AddressType', 'Resident');
+        DECLARE @EmployeeWorkflowStageId INT = dbo.SfWorkflowStageIdGet ('Employee', 'Employee');
+        DECLARE @RehireEmployeeWorkflowStageId INT = dbo.SfWorkflowStageIdGet ('Employee', 'Rehire');
+
+        DECLARE @NewHireWorkflowStageId INT = dbo.SfWorkflowStageIdGet ('NewHire', 'Onboard');
+        DECLARE @ApplicantworkWorkflowStageId INT = dbo.SfWorkflowStageIdGet ('Applicant', 'Applicant');
+
+        DECLARE @EmailCheckDeliveryListItemId INT = dbo.SfListItemIdGet ('CheckDelivery', 'HoldAtEmployeeOffice');
+
+        DECLARE @CultureId INT = dbo.SfCultureIdGet ('EN');
+        DECLARE @ContactRoleId INT = dbo.SfRoleIdGet ('Contact');
+        DECLARE @EmployeeRoleId INT = dbo.SfRoleIdGet ('Employee');
+        DECLARE @ApplicantRoleId INT = dbo.SfRoleIdGet ('Applicant');
+
+        DECLARE @NewHireRoleId INT = dbo.SfRoleIdGet ('NewHire');
+
+        DECLARE @TempJobCandidateWorkflowId INT = dbo.SfWorkflowIdGet ('JobCandidate');
+
+        DECLARE @ClosedWorkInjuryID INT = dbo.SfWorkflowStageIdGet ('WorkInjury', 'Closed');
+        DECLARE @InProgressdWorkInjuryID INT = dbo.SfWorkflowStageIdGet ('WorkInjury', 'InProgress');
+        --DECLARE @ActiveStatusListItemId INT = dbo.SfListItemIdGet ('Status', 'active');    
+        DECLARE @TerminatedStatusListItemId INT = dbo.SfListItemIdGet ('Status', 'Terminated');
+        DECLARE @ClosedStatusListItemId INT = dbo.SfListItemIdGet ('Status', 'Closed');
+        DECLARE @OpenStatusListItemId INT = dbo.SfListItemIdGet ('Status', 'Open');
+        DECLARE @UnknownSourceOfInjuryListItemId INT = dbo.SfListItemIdGet ('SourceOfInjury', 'Unknown');
+        DECLARE @UnknownTypeOfInjuryListItemId INT = dbo.SfListItemIdGet ('TypeOfInjury', 'Unknown');
+        DECLARE @UnknownBodyPartListItemId INT = dbo.SfListItemIdGet ('BodyPart', 'Unknown');
+        DECLARE @DocumentTypeListItemId INT = dbo.SfListItemIdGet ('DocumentType', 'Document');
+        DECLARE @HireDateTypeListItemId INT = dbo.SfListItemIdGet ('DateType', 'HiredDate');
+
+        DECLARE @EmployeeEmployeeTypeListItemId INT = dbo.SfListItemIdGet ('EmployeeType', 'Employee');
+        DECLARE @ContractorEmployeeTypeListItemId INT = dbo.SfListItemIdGet ('EmployeeType', 'Contractor');
+
+
+        DECLARE @NewHireEntityListItemId INT = dbo.SfListItemIdGet ('Entity', 'NewHire');
+        DECLARE @EmployeeEntityListItemId INT = dbo.SfListItemIdGet ('Entity', 'Employee');
+        DECLARE @ApplicantEntityListItemId INT = dbo.SfListItemIdGet ('Entity', 'Applicant');
+
+
+
+        DECLARE @EnteredByUserTypeListItemId INT = dbo.SfListItemIdGet ('UserType', 'EnteredBy');
+        DECLARE @CustomerEntityId INT;
+        SELECT @CustomerEntityId = dbo.SfListItemIdGet ('Entity', 'Customer');
+        DECLARE @NewCustomerEntityId INT;
+        SELECT @NewCustomerEntityId = dbo.SfListItemIdGet ('Entity', 'NewCustomer');
+        DECLARE @TargetEntityId INT;
+        SELECT @TargetEntityId = dbo.SfListItemIdGet ('Entity', 'Target');
+        DECLARE @LeadEntityId INT;
+        SELECT @LeadEntityId = dbo.SfListItemIdGet ('Entity', 'Lead');
+
+
+
+        DECLARE @ActiveStatusListItemId INT ,
+                @DNAStatusListItemId INT ,
+                @InActiveStatusListItemId INT;
+        SELECT @ActiveStatusListItemId = dbo.SfListItemIdGet ('Status', 'Active');
+        SELECT @InActiveStatusListItemId = dbo.SfListItemIdGet ('Status', 'InActive');
+        SELECT @DNAStatusListItemId = dbo.SfListItemIdGet ('Status', 'DNA');
+
+
+
+        SELECT @defaultotplanid = ( SELECT op.OTPlanId
+                                    FROM   dbo.OTPlan AS op
+                                    WHERE  op.OTPlan = 'over40Plan' );
+
+
+        DECLARE @MainAddressTypeListItemId INT = dbo.SfListItemIdGet ('AddressType', 'Main');
+        DECLARE @WorksiteAddressTypeListItemId INT = dbo.SfListItemIdGet ('AddressType', 'Jobsite');
+        DECLARE @Message VARCHAR (50);
+        DECLARE @ErrorMessage VARCHAR (MAX);
+
+        DECLARE @PlacedByUserTypeListItemId INT = dbo.SfListItemIdGet ('UserType', 'PlacedBy');
+        DECLARE @RecruiterByUserTypeListItemId INT = dbo.SfListItemIdGet ('UserType', 'Recruiter');
+
+
+
+        DECLARE @EmployeeWorkflowId INT = dbo.SfWorkflowIdGet ('Employee');
+        DECLARE @ApplicantWorkflowId INT = dbo.SfWorkflowIdGet ('Applicant');
+        DECLARE @NewHireWorkflowId INT = dbo.SfWorkflowIdGet ('NewHire');
+
+        SELECT @@SERVERNAME;
+
+        -- Person start --------
+
+        DROP TABLE IF EXISTS #TempPerson;
+         SELECT er.*
+        INTO   #TempPerson
+        -- select count(*)
+        FROM   anuska_2024_new.dbo.EmployeeData AS er
+               LEFT JOIN dbo.Person AS p ON  p.ReferenceId = CONVERT (VARCHAR (36), er.EmployeeID)
+                                         AND p.ReferenceNote = @ReferenceNote
+        WHERE  p.PersonId IS NULL
+        AND    er.Migrationstatus = 'Migrate';
+
+        -- select * from #TempPerson
+		SELECT @TableName='Person'
+		IF NOT EXISTS (SELECT TOP 1 1
+		FROM dbo.MigrationLog as ml
+		where ml.ReferenceNote=@ReferenceNote and ml.TableName=@TableName)
+		begin
+        BEGIN TRY
+		begin transaction;
+		begin
+
+            IF EXISTS ( SELECT TOP 1 1
+                        FROM   #TempPerson AS tp )
+                BEGIN
+                    BEGIN TRY
+                        BEGIN TRANSACTION;
+                        --1.Person
+                        BEGIN
+                            SELECT @OldCount = COUNT (*) ,
+                                   @TableName = 'Person'
+                            FROM   #TempPerson AS tp;
+
+                            EXEC dbo.SpMigrationLogIns @OldCount = @OldCount ,          -- int
+                                                       @TableName = @TableName ,        -- varchar(50)
+                                                       @ReferenceNote = @ReferenceNote; -- varchar(100)
+
+                            SET IDENTITY_INSERT dbo.Person ON;
+
+                            INSERT INTO dbo.Person ( PersonId ,
+                                                     FirstName ,
+                                                     MiddleName ,
+                                                     LastName ,
+                                                     SSN ,
+                                                     OrganizationId ,
+                                                     Title ,
+                                                     UserPersonId ,
+                                                     InsertDate ,
+                                                     ReferenceId ,
+                                                     ReferenceNote ,
+                                                     TIN )
+                                       SELECT p.EmployeeID ,
+                                               p.FirstName ,
+                                               p.MiddleName ,
+                                               p.LastName,
+                                               dbo.SfMaskSSN (
+                                                   ISNULL (
+                                                       CONCAT (REPLICATE ('0', 9 - LEN (p.SSN)), p.SSN), '000000000')) ,
+                                               dbo.SfOrganizationIdGet (@defaultofficeid, 'U') ,
+                                               CASE WHEN p.EmployeeType = 'Employee' THEN 'Employee'
+                                                    WHEN p.EmployeeType = 'Applicant' THEN 'Applicant'
+                                                    WHEN p.EmployeeType = 'NewHire' THEN 'NewHire'
+                                               END ,
+                                               @UserPersonId ,
+                                               GETDATE (),-- ISNULL (p.Insertdate, GETDATE ()) ,
+                                               p.EmployeeID ,
+                                               @ReferenceNote,
+                                               dbo.SfEncrypt (
+                                                   ISNULL (
+                                                       CONCAT (
+                                                           REPLICATE ('0', 9 - LEN (ISNULL (p.SSN, 0))) ,
+                                                           ISNULL (p.SSN, 0)) ,
+                                                       '000000000') ,
+                                                   'e')
+												   --select * 
+                                        FROM   #TempPerson AS p 
+                                               LEFT JOIN dbo.MappingData AS md 
+                                               INNER JOIN dbo.Mapping AS m ON  m.MappingId = md.MappingId ON md.Data1 = CONVERT (
+                                                                                                 VARCHAR (50) ,
+                                                                                                 @defaultofficeid)
+                                                                           AND m.Mapping = 'Office'
+                                                                           AND m.MappingTypeId = @MappingTypeId 
+                                               INNER JOIN dbo.Office AS o ON o.OfficeId = ISNULL (
+                                                                                              md.MapToId ,
+                                                                                              @defaultofficeid)
+                                               LEFT JOIN dbo.Person AS p2 ON  p2.ReferenceId = CONVERT (
+                                                                                                   VARCHAR (50) ,
+                                                                                                   p.EmployeeID)
+                                                                          AND p2.ReferenceNote = @ReferenceNote
+                                        WHERE  p2.PersonId IS  NULL
+
+                                        AND    p.EmployeeID > 0
+                                        AND    p.EmployeeID NOT IN ( SELECT p3.PersonId
+                                                                     FROM   dbo.Person AS p3 ); --adjusted
+
+                            SET IDENTITY_INSERT dbo.Person OFF;
+
+                            INSERT INTO dbo.Person ( 
+                                                     FirstName ,
+                                                     MiddleName ,
+                                                     LastName ,
+                                                     SSN ,
+                                                     OrganizationId ,
+                                                     Title ,
+                                                     UserPersonId ,
+                                                     InsertDate ,
+                                                     ReferenceId ,
+                                                     ReferenceNote ,
+                                                     TIN )
+                                       SELECT 
+                                               p.FirstName ,
+                                               p.MiddleName ,
+                                               p.LastName,
+                                               dbo.SfMaskSSN (
+                                                   ISNULL (
+                                                       CONCAT (REPLICATE ('0', 9 - LEN (p.SSN)), p.SSN), '000000000')) ,
+                                               dbo.SfOrganizationIdGet (@defaultofficeid, 'U') ,
+                                               CASE WHEN p.EmployeeType = 'Employee' THEN 'Employee'
+                                                    WHEN p.EmployeeType = 'Applicant' THEN 'Applicant'
+                                                    WHEN p.EmployeeType = 'NewHire' THEN 'NewHire'
+                                               END ,
+                                               @UserPersonId ,
+                                               GETDATE (),-- ISNULL (p.Insertdate, GETDATE ()) ,
+                                               p.EmployeeID ,
+                                               @ReferenceNote,
+                                               dbo.SfEncrypt (
+                                                   ISNULL (
+                                                       CONCAT (
+                                                           REPLICATE ('0', 9 - LEN (ISNULL (p.SSN, 0))) ,
+                                                           ISNULL (p.SSN, 0)) ,
+                                                       '000000000') ,
+                                                   'e')
+												   --select * 
+                                        FROM   #TempPerson AS p 
+                                               LEFT JOIN dbo.MappingData AS md 
+                                               INNER JOIN dbo.Mapping AS m ON  m.MappingId = md.MappingId ON md.Data1 = CONVERT (
+                                                                                                 VARCHAR (50) ,
+                                                                                                 @defaultofficeid)
+                                                                           AND m.Mapping = 'Office'
+                                                                           AND m.MappingTypeId = @MappingTypeId 
+                                               INNER JOIN dbo.Office AS o ON o.OfficeId = ISNULL (
+                                                                                              md.MapToId ,
+                                                                                              @defaultofficeid)
+                                               LEFT JOIN dbo.Person AS p2 ON  p2.ReferenceId = CONVERT (
+                                                                                                   VARCHAR (50) ,
+                                                                                                   p.EmployeeID)
+                                                                          AND p2.ReferenceNote = @ReferenceNote
+                                        WHERE  p2.PersonId IS  NULL
+
+                                        AND    p.EmployeeID > 0
+                                        AND    p.EmployeeID NOT IN ( SELECT p3.PersonId
+                                                                     FROM   dbo.Person AS p3 );
+
+                            SELECT @NewCOunt = COUNT (*)
+                            FROM   dbo.Person AS p
+                                   INNER JOIN #TempPerson AS tp ON CONVERT (VARCHAR (50), tp.EmployeeID) = p.ReferenceId
+                            WHERE  p.ReferenceNote = @ReferenceNote;
+
+                            EXEC dbo.SpMigrationLogUpd @NewCount = @NewCOunt ,
+                                                       @TableName = @TableName ,
+                                                       @ReferenceNote = @ReferenceNote;
+
+                            SET @ErrorMessage = CONCAT (
+                                                    'Old Count : ' ,
+                                                    @OldCount ,
+                                                    ' New Count : ' ,
+                                                    @NewCOunt ,
+                                                    ' For Table : ' ,
+                                                    @TableName);
+                            IF ( @OldCount <> @NewCOunt )
+                                BEGIN
+                                    RAISERROR ('Data Insertion Failed ,%s', 16, 1, @ErrorMessage);
+                                END;
+
+
+
+                            ELSE IF ( @OldCount = @NewCOunt )
+                                BEGIN
+                                    RAISERROR ('Data Insertion Successful ,%s', 0, 1, @ErrorMessage);
+                                 END;
+                        END;
+                        COMMIT TRANSACTION;
+                    END TRY
+                    BEGIN CATCH
+                        IF @@TRANCOUNT > 0
+                            ROLLBACK TRANSACTION;
+                        THROW;
+                    END CATCH;
+                END;
+            END;
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0
+                ROLLBACK TRANSACTION;
+            THROW;
+        END CATCH;
+    END;
+END;
+
+
+--EXEC [dbo].[SpAnuska_2024_newToZenopleMigrationTsk]
+
+--select *from person order by 1 desc

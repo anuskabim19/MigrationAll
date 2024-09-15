@@ -1,0 +1,114 @@
+to delete::
+
+delete md 
+--select md. *
+from mapping m
+inner join MappingType mt on mt.MappingTypeId=m.MappingTypeId
+inner join mappingdata md on md.MappingId=m.MappingId
+where mt.MappingType like '%anuska%'  
+
+--------------------------------
+concat value
+
+alter table employeedata
+drop column zip
+
+
+use Anuska_2024_new
+
+select *from CustomerData
+
+alter table customerdata
+add  Zip nvarchar(max)
+UPDATE CustomerData
+SET
+    Address1 = CASE
+                  WHEN CHARINDEX(',', Address) > 0 THEN LEFT(Address, CHARINDEX(',', Address) - 1)
+                  ELSE Address
+               END,
+    Address2 = CASE
+                  WHEN CHARINDEX(',', Address) > 0 AND CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) > 0 THEN
+                      SUBSTRING(
+                          Address,
+                          CHARINDEX(',', Address) + 2,
+                          CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) - CHARINDEX(',', Address) - 2
+                      )
+                  ELSE NULL
+               END,
+    State = CASE
+              WHEN CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) > 0 THEN
+                  LTRIM(SUBSTRING(
+                      Address,
+                      CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) + 2,
+                      CASE
+                          WHEN CHARINDEX(' ', Address, CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) + 2) > 0
+                          THEN CHARINDEX(' ', Address, CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) + 2) - CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) - 2
+                          ELSE LEN(Address) - CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) - 1
+                      END
+                  ))
+              ELSE NULL
+           END,
+    ZIP = CASE
+             WHEN CHARINDEX(' ', Address, CHARINDEX(',', Address, CHARINDEX(',', Address) + 1) + 1) > 0 THEN
+                 LTRIM(RIGHT(Address, CHARINDEX(' ', REVERSE(Address)) - 1))
+             ELSE NULL
+          END;
+
+
+--------------------------------------------------------------
+migration log
+
+
+
+delete ml
+--select * 
+from migrationlog as ml where ReferenceNote='testmigration_anuska'
+
+select * from MigrationLog ml 
+where ReferenceNote = 'TestMigration_Anuska'
+order by 1 desc
+
+delete from migrationlog 
+where MigrationLogId=438 
+
+
+	UPDATE employeedata
+SET 
+    Email = SUBSTRING(ContactInformation, 1, CHARINDEX(',', ContactInformation) - 1),
+    Phone = LTRIM(SUBSTRING(ContactInformation, CHARINDEX(',', ContactInformation) + 1, LEN(ContactInformation)));
+
+
+
+ SELECT Value
+FROM (
+    SELECT email AS Value
+    FROM employeedata
+    WHERE email IS NOT NULL
+
+    UNION ALL
+
+    SELECT phone AS Value
+    FROM employeedata
+    WHERE phone IS NOT NULL
+) AS combined
+WHERE Value IS NOT NULL;
+
+---------------------------
+maptoid update
+
+
+
+52388	End of Contract  :204067
+update MappingData
+set MapToId=204067
+where MappingDataId=52388
+
+52389	End of Project  listitemid:204068
+update MappingData
+set MapToId=204068
+where MappingDataId=52389
+
+52390	Project Completed  :Completed :200641
+update MappingData
+set MapToId=200641
+where MappingDataId=52390

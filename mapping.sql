@@ -1,0 +1,16 @@
+
+
+select *from Mapping m
+inner join MappingType mt on mt.MappingTypeId=m.MappingTypeId
+where mt.MappingType= 'TestMigration_Anuska' 
+and Mapping='Employee_status'
+order by 1 desc
+
+select *From MappingType
+select *from Mappingdata where mappingty=200034
+
+EXEC dbo.SpMigrationMappingIns @MappingType = 'TestMigration_Anuska';
+
+
+
+SELECT @MappingName = 'Employee_status';                SELECT @MappingId = ( SELECT MappingId                                      FROM   dbo.Mapping                                      WHERE  Mapping = 'Employee_status'                                      AND    MappingTypeId = @MappingTypeId );                INSERT INTO #Mappingdata ( MappingId ,                                           Mappingname ,                                           MapFromId ,                                           MapFrom ,                                           Data1 ,                                           Data2 ,                                           UserPersonId ,                                           InsertDate ,                                           Example )                            SELECT   @MappingId ,                                     @MappingName , --select                                     NULL AS Mapfromid ,                                     ISNULL (LTRIM (RTRIM (ar.ChoiceCode)), er.EmployeeStatusConfigChoiceID) AS Mapfrom ,                                     LTRIM (RTRIM (er.EmployeeStatusConfigChoiceID)) AS Data1 ,                                     COUNT (*) AS Data2 ,                                     3 AS UserPersonId ,                                     GETDATE () AS InsertDate ,                                     MAX (                                         LEFT('EmployeeID: ' + CONVERT (VARCHAR (255), er.EmployeeID)                                              + ' Employee Name: ' + ISNULL (er.FirstName, '') + ' '                                              + ISNULL (er.LastName, ''), 255)) AS Example                            -- select distinct EmployeeStatusConfigChoiceID,ar.ChoiceCode                            FROM     [A-France-0124].Davis_Avionte.[dbo].Employee er                                     LEFT JOIN [A-France-0124].Davis_Avionte.[dbo].ConfigChoice ar ON er.EmployeeStatusConfigChoiceID = ar.ConfigChoiceID                                     LEFT JOIN dbo.MappingData md ON  md.Data1 = CONVERT (                                                                                     VARCHAR (MAX) ,                                                                                     er.EmployeeStatusConfigChoiceID)                                                                  AND md.MappingId = @MappingId                            WHERE    md.MappingDataId IS NULL                            AND      er.Migrationstatus = 'Migrate'                            GROUP BY er.EmployeeStatusConfigChoiceID ,                                     ISNULL (LTRIM (RTRIM (ar.ChoiceCode)), er.EmployeeStatusConfigChoiceID)                            ORDER BY ISNULL (LTRIM (RTRIM (ar.ChoiceCode)), er.EmployeeStatusConfigChoiceID);
